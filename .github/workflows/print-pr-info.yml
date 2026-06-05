@@ -39,10 +39,9 @@ jobs:
             // Extract label names
             const labels = pr.labels.map(label => label.name);
 
-            // Extract the ticketId label specifically (e.g. a label like "ticket-123" or "JIRA-456")
-            const ticketIdLabel = labels.find(l =>
-              /^ticket[:\-_]?\w+/i.test(l) || /^[A-Z]+-\d+$/.test(l)
-            ) ?? 'N/A';
+            // Extract the ticketId label in the format "ticketId:1234567890"
+            const ticketIdLabel = labels.find(l => /^ticketId:\d+$/.test(l));
+            const ticketId = ticketIdLabel ? ticketIdLabel.split(':')[1] : 'N/A';
 
             // Print a structured summary
             core.summary
@@ -60,7 +59,7 @@ jobs:
               .addHeading('🏷️ Labels', 3)
               .addRaw(labels.length > 0 ? labels.map(l => `\`${l}\``).join(', ') : '_No labels_')
               .addHeading('🎫 Ticket ID', 3)
-              .addRaw(`\`${ticketIdLabel}\``)
+              .addRaw(`\`${ticketId}\``)
               .write();
 
             // Also print to the step log for quick visibility
@@ -78,4 +77,4 @@ jobs:
             console.log(labels.length > 0 ? labels.join(', ') : '(no labels)');
             console.log('');
             console.log(`--- Ticket ID ---`);
-            console.log(ticketIdLabel);
+            console.log(ticketId);
