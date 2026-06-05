@@ -1,0 +1,81 @@
+name: Print PR Info on Push to Main
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  print-pr-info:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+
+    steps:
+      - name: Find associated PR and print info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const commitSha = context.sha;
+
+            // Find the PR(s) associated with this commit
+            const prsResponse = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+              owner,
+              repo,
+              commit_sha: commitSha,
+            });
+
+            const prs = prsResponse.data;
+
+            if (prs.length === 0) {
+              core.warning(`No PR found associated with commit ${commitSha}. The push may have been made directly to main.`);
+              return;
+            }
+
+            // Use the most recently merged PR (first in the list)
+            const pr = prs[0];
+
+            // Extract label names
+            const labels = pr.labels.map(label => label.name);
+
+            // Extract the ticketId label specifically (e.g. a label like "ticket-123" or "JIRA-456")
+            const ticketIdLabel = labels.find(l =>
+              /^ticket[:\-_]?\w+/i.test(l) || /^[A-Z]+-\d+$/.test(l)
+            ) ?? 'N/A';
+
+            // Print a structured summary
+            core.summary
+              .addHeading('📋 Associated Pull Request', 2)
+              .addTable([
+                [{ data: 'Field', header: true }, { data: 'Value', header: true }],
+                ['PR Number',  `#${pr.number}`],
+                ['Title',      pr.title],
+                ['Author',     pr.user.login],
+                ['Merged at',  pr.merged_at ?? 'N/A'],
+                ['URL',        pr.html_url],
+              ])
+              .addHeading('📝 Body', 3)
+              .addRaw(pr.body ? pr.body : '_No description provided._')
+              .addHeading('🏷️ Labels', 3)
+              .addRaw(labels.length > 0 ? labels.map(l => `\`${l}\``).join(', ') : '_No labels_')
+              .addHeading('🎫 Ticket ID', 3)
+              .addRaw(`\`${ticketIdLabel}\``)
+              .write();
+
+            // Also print to the step log for quick visibility
+            console.log('=== PR Info ===');
+            console.log(`PR Number : #${pr.number}`);
+            console.log(`Title     : ${pr.title}`);
+            console.log(`Author    : ${pr.user.login}`);
+            console.log(`URL       : ${pr.html_url}`);
+            console.log(`Merged at : ${pr.merged_at ?? 'N/A'}`);
+            console.log('');
+            console.log('--- Body ---');
+            console.log(pr.body ?? '(no description)');
+            console.log('');
+            console.log('--- Labels ---');
+            console.log(labels.length > 0 ? labels.join(', ') : '(no labels)');
+            console.log('');
+            console.log(`--- Ticket ID ---`);
+            console.log(ticketIdLabel);
